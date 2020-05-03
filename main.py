@@ -38,11 +38,12 @@ def update_database(database, row: list):
     index = tuple(row[1].split('.')[0:2])
     ip = ip_network(row[1], strict=False)
     detail = (row[0], '-'.join(row[2].split('/'))) # Website, updating date
-    if index in database:
-        database[index].setdefault(ip, []).append(detail)
-    else:
-        database[index] = dict()
-        database[index].setdefault(ip, []).append(detail)
+    database[index].setdefault(ip, set()).add(detail)
+    # if index in database:
+    #     database[index].setdefault(ip, []).append(detail)
+    # else:
+    #     database[index] = dict()
+    #     database[index].setdefault(ip, []).append(detail)
     
 def load_database(filename):
     with open('data.pickle','rb') as fin:
@@ -71,3 +72,6 @@ def main():
     
 if __name__ == "__main__":
     main()
+
+
+a = set()
