@@ -34,6 +34,7 @@ def create_database(filename):
     
     return db
 
+
 def update_database(database, row: list):
     index = tuple(row[1].split('.')[0:2])
     ip = ip_network(row[1], strict=False)
@@ -45,10 +46,12 @@ def update_database(database, row: list):
     #     database[index] = dict()
     #     database[index].setdefault(ip, []).append(detail)
     
+    
 def load_database(filename):
     with open('data.pickle','rb') as fin:
         db = pickle.load(fin)
     return db
+
 
 def search_in_database(database, ip: ip_address):
     result = []
@@ -59,19 +62,29 @@ def search_in_database(database, ip: ip_address):
                 result.append((network, database[index][network]))
 
     return result
-         
+
+
+def beautiful_result(results):
+    if not results:
+        print("IP not found.")
+        return None
+    for result in results:
+        string = "'%s' network detail:\n" % ( str(result[0]))
+        string += "                  site         |      date \n"
+        string += "------------------------------------------\n"
+        for detail in result[1]:
+            string += "%30s| %10s\n" % (detail[0], detail[1])
+        print(string)
+
 def main():
-    if not os.path.exists('./'+filename):
-        db = create_database(filename)
-    else:
-        db = load_database(filename)
+    db = load_database(filename) if os.path.exists('./'+filename) else create_database(filename)
     
-    ip = ip_address('185.4.3.14')
-    result = search_in_database(db, ip)
-    print(result)
+    ip = ip_address('185.88.153.218')
+    results = search_in_database(db, ip)
+    #print(results)
+    beautiful_result(results)
+    
+    
     
 if __name__ == "__main__":
     main()
-
-
-a = set()
