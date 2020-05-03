@@ -49,14 +49,25 @@ def load_database(filename):
         db = pickle.load(fin)
     return db
 
+def search_in_database(database, ip: ip_address):
+    result = []
+    index = tuple(str(ip).split('.')[0:2])
+    if index in database:
+        for network in database[index]:
+            if ip in network:
+                result.append((network, database[index][network]))
 
+    return result
+         
 def main():
     if not os.path.exists('./'+filename):
         db = create_database(filename)
     else:
         db = load_database(filename)
-    print(len(db))
-    print(len(db['185','4']))
-
+    
+    ip = ip_address('185.4.3.14')
+    result = search_in_database(db, ip)
+    print(result)
+    
 if __name__ == "__main__":
     main()
