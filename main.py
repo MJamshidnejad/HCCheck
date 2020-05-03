@@ -9,6 +9,7 @@
 import collections 
 import os
 import pickle
+from ipaddress import ip_address, ip_network
 
 import xlrd
 
@@ -35,7 +36,7 @@ def create_database(filename):
 
 def update_database(database, row: list):
     index = tuple(row[1].split('.')[0:2])
-    ip = row[1]
+    ip = ip_network(row[1], strict=False)
     detail = (row[0], '-'.join(row[2].split('/'))) # Website, updating date
     if index in database:
         database[index].setdefault(ip, []).append(detail)
