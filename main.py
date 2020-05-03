@@ -6,44 +6,56 @@
     
 """
 
-import codecs
-import sys
 import collections 
+import os
+import pickle
 
 import xlrd
 
-db = collections.defaultdict(dict)
-masks = collections.Counter()
+raw_file = 'list.xls'
+filename = 'data.pickle'
 
-test = dict()
+def create_database(filename):
+    db = collections.defaultdict(dict)
+    try:
+        xl = xlrd.open_workbook(raw_file)
+    except:
+        print(raw_file + " not found.")
+        quit()
 
+    sheet = xl.sheet_by_index(0)
+    for i in range (1,sheet.nrows): 
+        row = [x.value for x in sheet.row(i)]
+        update_database(db, row)
 
-def update_database(row: list):
+    with open(filename, 'wb') as fout:
+        pickle.dump(db, fout, pickle.HIGHEST_PROTOCOL)
+    
+    return db
+
+def update_database(database, row: list):
     index = tuple(row[1].split('.')[0:2])
     ip = row[1]
     detail = (row[0], '-'.join(row[2].split('/'))) # Website, updating date
-    db[index].setdefault(ip, []).append(detail)
+    if index in database:
+        database[index].setdefault(ip, []).append(detail)
+    else:
+        database[index] = dict()
+        database[index].setdefault(ip, []).append(detail)
     
-def check_masks():
-    xl = xlrd.open_workbook("list.xls")
-    sheet = xl.sheet_by_index(0) 
-    for i in range(1,20):
-       cell = sheet.cell_value(i,1)
-       mask = cell.split('/')[1]
-       masks.update((mask,))
-    print(mask)
-    result = masks.most_common()
-    print(result)
-
-       
-xl = xlrd.open_workbook("list.xls")
-sheet = xl.sheet_by_index(0)
-for i in range (1,sheet.nrows):
-    row = sheet.row(i)
-    row = [x.value for x in row]
-    update_database(row)
-
-print(len(db['185','4']))
+def load_database(filename):
+    with open('data.pickle','rb') as fin:
+        db = pickle.load(fin)
+    return db
 
 
-    
+def main():
+    if not os.path.exists('./'+filename):
+        db = create_database(filename)
+    else:
+        db = load_database(filename)
+    print(len(db))
+    print(len(db['185','4']))
+
+if __name__ == "__main__":
+    main()
