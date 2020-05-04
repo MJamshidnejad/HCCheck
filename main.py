@@ -6,7 +6,7 @@
     
 """
 
-import collections 
+import collections
 import os
 import pickle
 from ipaddress import ip_address, ip_network
@@ -15,6 +15,8 @@ import xlrd
 
 raw_file = 'list.xls'
 filename = 'data.pickle'
+file_link = 'https://g2b.ito.gov.ir/index.php/site/page/view/download'
+
 
 def create_database(filename):
     db = collections.defaultdict(dict)
@@ -25,30 +27,30 @@ def create_database(filename):
         quit()
 
     sheet = xl.sheet_by_index(0)
-    for i in range (1,sheet.nrows): 
-        row = [x.value for x in sheet.row(i)]
+    for i in range(1, sheet.nrows):
+        row = sheet.row_values(i)
         update_database(db, row)
 
     with open(filename, 'wb') as fout:
         pickle.dump(db, fout, pickle.HIGHEST_PROTOCOL)
-    
+
     return db
 
 
 def update_database(database, row: list):
     index = tuple(row[1].split('.')[0:2])
     ip = ip_network(row[1], strict=False)
-    detail = (row[0], '-'.join(row[2].split('/'))) # Website, updating date
+    detail = (row[0], '-'.join(row[2].split('/')))  # Website, updating date
     database[index].setdefault(ip, set()).add(detail)
     # if index in database:
     #     database[index].setdefault(ip, []).append(detail)
     # else:
     #     database[index] = dict()
     #     database[index].setdefault(ip, []).append(detail)
-    
-    
+
+
 def load_database(filename):
-    with open('data.pickle','rb') as fin:
+    with open('data.pickle', 'rb') as fin:
         db = pickle.load(fin)
     return db
 
@@ -69,22 +71,24 @@ def beautiful_result(results):
         print("IP not found.")
         return None
     for result in results:
-        string = "'%s' network detail:\n" % ( str(result[0]))
+        string = "'%s' network detail:\n" % (str(result[0]))
         string += "                  site         |      date \n"
         string += "------------------------------------------\n"
         for detail in result[1]:
             string += "%30s| %10s\n" % (detail[0], detail[1])
         print(string)
 
+
 def main():
-    db = load_database(filename) if os.path.exists('./'+filename) else create_database(filename)
-    
+    db = load_database(filename) if os.path.exists('./' + filename) else create_database(filename)
+
     ip = ip_address('185.88.153.218')
     results = search_in_database(db, ip)
-    #print(results)
+    # print(results)
     beautiful_result(results)
-    
-    
-    
+
+
+
+
 if __name__ == "__main__":
     main()
