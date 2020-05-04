@@ -12,13 +12,13 @@ import pickle
 from ipaddress import ip_address, ip_network
 
 import urllib3
+import win32com.client
 import xlrd
 from tqdm import tqdm
-import win32com.client
 
 raw_file = 'list.xls'
-filename = 'data.pickle'
-file_link = 'https://g2b.ito.gov.ir/index.php/site/page/view/download'
+db_name = 'data.pickle'
+url_file = 'https://g2b.ito.gov.ir/index.php/site/page/view/download'
 
 
 def create_database(filename):
@@ -101,21 +101,21 @@ def download_file(url, filename):
 
 def main():
     print("Welcome to HCCheck")
-    if os.path.exists('./' + filename):
+    if os.path.exists('./' + db_name):
         if True: print("Loading database...")
-        db = load_database(filename)
+        db = load_database(db_name)
         print("Database loaded.")
         
     elif os.path.exists('./' + raw_file):
         print("Creating database...")
-        db = create_database(filename)
+        db = create_database(db_name)
         print("Database created.")
     else:
         print("You need to download list file.")
-        download_file(file_link, raw_file)
+        download_file(url_file, raw_file)
         print("The list downloaded.")
         print("Creating database...")
-        db = create_database(filename)
+        db = create_database(db_name)
         print("Database created.")
     
     
