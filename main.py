@@ -88,7 +88,27 @@ def main():
     beautiful_result(results)
 
 
+import urllib.request
+import urllib3
+from tqdm import tqdm
 
 
 if __name__ == "__main__":
-    main()
+    # request = urllib.request.urlretrieve(file_link, raw_file)
+    # print(request)
+
+    http = urllib3.PoolManager(num_pools=50)
+    r = http.request('get', file_link, preload_content=False)
+    if r.status == 200:
+        with open("list_test.xls", "wb") as handle:
+            for data in tqdm(r.stream(1), unit=' B', desc='Downloading: ', ncols=70):
+                handle.write(data)
+        r.release_conn()
+    print(r.info())
+
+    # import requests
+    # res = requests.get(file_link, verify=False, stream=True)
+    # with open("list_test.xls", "wb") as handle:
+    #     for data in tqdm(res.iter_content(chunk_size=1024), unit=' KB', desc='Downloading: ', ncols=70):
+    #         handle.write(data)
+
