@@ -11,7 +11,9 @@ import os
 import pickle
 from ipaddress import ip_address, ip_network
 
-import xlrd 
+import xlrd
+import pandas as pd             # Panda has problem too. because uses xlrd!
+import win32com.client              # I use win32com to open and save the file
 
 raw_file = 'list.xls'
 filename = 'data.pickle'
@@ -19,6 +21,12 @@ filename = 'data.pickle'
 def create_database(filename):
     db = collections.defaultdict(dict)
     try:
+        xcl = win32com.client.Dispatch('Excel.Application')
+        wb = xcl.workbooks.open(os.getcwd()+'\\'+'list.xls')
+        xcl.DisplayAlerts = False
+        wb.Save()
+        xcl.Quit()
+        
         xl = xlrd.open_workbook(raw_file)
     except:
         print(raw_file + " not found.") # problem is here
@@ -88,4 +96,3 @@ def main():
     
 if __name__ == "__main__":
     main()
- 
