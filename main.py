@@ -82,23 +82,36 @@ def beautiful_result(results):
         
 def download_file(url, filename):
     http = urllib3.PoolManager(num_pools=50)
-    r = http.request('get', file_link, preload_content=False)
+    r = http.request('get', url, preload_content=False)
     if r.status == 200:
-        with open("list_test.xls", "wb") as handle:
+        with open(filename, "wb") as handle:
             for data in tqdm(r.stream(1), unit=' B', desc='Downloading: ', ncols=70):
                 handle.write(data)
         r.release_conn()
+    else:
+        print("Download failed.")
 
 
 def main():
+    print("Welcome to HCCheck")
     if os.path.exists('./' + filename):
+        if True: print("Loading database...")
         db = load_database(filename)
+        print("Database loaded.")
+        
     elif os.path.exists('./' + raw_file):
+        print("Creating database...")
         db = create_database(filename)
+        print("Database created.")
     else:
-        download_file(file_link, filename)
+        print("You need to download list file.")
+        download_file(file_link, raw_file)
+        print("The list downloaded.")
+        print("Creating database...")
         db = create_database(filename)
-
+        print("Database created.")
+    
+    
     ip = ip_address('185.88.153.218')
     results = search_in_database(db, ip)
     beautiful_result(results)
