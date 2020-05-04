@@ -12,8 +12,7 @@ import pickle
 from ipaddress import ip_address, ip_network
 
 import xlrd
-import pandas as pd             # Panda has problem too. because uses xlrd!
-import win32com.client              # I use win32com to open and save the file
+import win32com.client
 
 raw_file = 'list.xls'
 filename = 'data.pickle'
@@ -89,7 +88,6 @@ def main():
     
     ip = ip_address('185.88.153.218')
     results = search_in_database(db, ip)
-    #print(results)
     beautiful_result(results)
     
     
