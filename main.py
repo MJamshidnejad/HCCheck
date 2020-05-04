@@ -11,7 +11,7 @@ import os
 import pickle
 from ipaddress import ip_address, ip_network
 
-import xlrd
+import xlrd 
 
 raw_file = 'list.xls'
 filename = 'data.pickle'
@@ -21,7 +21,7 @@ def create_database(filename):
     try:
         xl = xlrd.open_workbook(raw_file)
     except:
-        print(raw_file + " not found.")
+        print(raw_file + " not found.") # problem is here
         quit()
 
     sheet = xl.sheet_by_index(0)
@@ -88,3 +88,4 @@ def main():
     
 if __name__ == "__main__":
     main()
+ 
