@@ -14,6 +14,7 @@ from ipaddress import ip_address, ip_network
 import urllib3
 import xlrd
 from tqdm import tqdm
+import win32com.client
 
 raw_file = 'list.xls'
 filename = 'data.pickle'
@@ -23,9 +24,15 @@ file_link = 'https://g2b.ito.gov.ir/index.php/site/page/view/download'
 def create_database(filename):
     db = collections.defaultdict(dict)
     try:
+        xcl = win32com.client.Dispatch('Excel.Application')
+        wb = xcl.workbooks.open(os.getcwd()+'\\'+'list.xls')
+        xcl.DisplayAlerts = False
+        wb.Save()
+        xcl.Quit()
+        
         xl = xlrd.open_workbook(raw_file)
     except:
-        print(raw_file + " not found.")
+        print(raw_file + " not found.") # problem is here
         quit()
 
     sheet = xl.sheet_by_index(0)
