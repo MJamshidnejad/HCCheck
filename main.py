@@ -11,7 +11,9 @@ import os
 import pickle
 from ipaddress import ip_address, ip_network
 
+import urllib3
 import xlrd
+from tqdm import tqdm
 
 raw_file = 'list.xls'
 filename = 'data.pickle'
@@ -77,26 +79,8 @@ def beautiful_result(results):
         for detail in result[1]:
             string += "%30s| %10s\n" % (detail[0], detail[1])
         print(string)
-
-
-def main():
-    db = load_database(filename) if os.path.exists('./' + filename) else create_database(filename)
-
-    ip = ip_address('185.88.153.218')
-    results = search_in_database(db, ip)
-    # print(results)
-    beautiful_result(results)
-
-
-import urllib.request
-import urllib3
-from tqdm import tqdm
-
-
-if __name__ == "__main__":
-    # request = urllib.request.urlretrieve(file_link, raw_file)
-    # print(request)
-
+        
+def download_file(url, filename):
     http = urllib3.PoolManager(num_pools=50)
     r = http.request('get', file_link, preload_content=False)
     if r.status == 200:
@@ -104,11 +88,21 @@ if __name__ == "__main__":
             for data in tqdm(r.stream(1), unit=' B', desc='Downloading: ', ncols=70):
                 handle.write(data)
         r.release_conn()
-    print(r.info())
 
-    # import requests
-    # res = requests.get(file_link, verify=False, stream=True)
-    # with open("list_test.xls", "wb") as handle:
-    #     for data in tqdm(res.iter_content(chunk_size=1024), unit=' KB', desc='Downloading: ', ncols=70):
-    #         handle.write(data)
 
+def main():
+    if os.path.exists('./' + filename):
+        db = load_database(filename)
+    elif os.path.exists('./' + raw_file):
+        db = create_database(filename)
+    else:
+        download_file(file_link, filename)
+        db = create_database(filename)
+
+    ip = ip_address('185.88.153.218')
+    results = search_in_database(db, ip)
+    beautiful_result(results)
+
+
+if __name__ == "__main__":
+    main()
