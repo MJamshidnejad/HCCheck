@@ -21,7 +21,14 @@ raw_file = 'list.xls'
 db_name = 'data.pickle'
 url_file = 'https://g2b.ito.gov.ir/index.php/site/page/view/download'
 
-help_str = ''' '''
+help_str = """This program check if IP is in national network or not.
+it uses ITOs list for doing that.
+    commands:
+    IP: example of a valid IP: 185.5.250.6
+    
+    -h or --help: give help
+    -e or --exit: exit
+    -q or --quit: quit (!)\n"""
 
 def create_database(filename):
     db = collections.defaultdict(dict)
@@ -79,15 +86,16 @@ def search_in_database(database, ip: ip_address):
 
 def beautiful_result(results):
     if not results:
-        print("IP not found.")
+        print("IP not found.\n")
         return None
     for result in results:
         string = "'%s' network detail:\n" % (str(result[0]))
-        string += "                  site         |      date \n"
+        string += "               site             |      date \n"
         string += "------------------------------------------\n"
         for detail in result[1]:
             string += "%30s| %10s\n" % (detail[0], detail[1])
         print(string)
+    print('')
 
 
 def download_file(url, filename):
@@ -99,14 +107,12 @@ def download_file(url, filename):
                 handle.write(data)
         r.release_conn()
     else:
-        print("Download failed.")
+        print("Download failed.\n")
         
 
 def is_ip_valid(ip: str):
-    pattern = '''^(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.( 
-                25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.( 
-                25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.( 
-                25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)'''
+    byte_pattern = "(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)"
+    pattern = r"^%s\.%s\.%s\.%s" % ((byte_pattern,)*4)
     if re.search(pattern, ip):
         return True
     return False
@@ -132,16 +138,24 @@ def main():
         print("Database created.")
     
     while True:
-        
         command = input("Input your IP or your command:\n> ")
-        command = command.strip().lower() 
-        if command == '--help' or command == '-h' :
+        command = command.strip().lower()
+        print(command)
+        if command in ('-h', '--help') :
             print(help_str)
-            continue
         
-        ip = ip_address('185.88.153.218')
-        results = search_in_database(db, ip)
-        beautiful_result(results)
+        elif command in ('-q', '-e', '--quit', '--exit'):
+            print('Thank you. Have good!\n')
+            quit()
+        
+        elif is_ip_valid(command):
+            ip = ip_address(command)
+            results = search_in_database(db, ip)
+            beautiful_result(results)
+        
+        else:
+            print("Your command is not valid.\n"
+                    +"Get help with -h or --help\n")
 
 
 if __name__ == "__main__":
