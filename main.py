@@ -90,10 +90,10 @@ def beautiful_result(results):
         return None
     for result in results:
         string = "'%s' network detail:\n" % (str(result[0]))
-        string += "               site             |      date \n"
-        string += "------------------------------------------\n"
+        string += "               site            |    date \n"
+        string += "----------------------------------------------\n"
         for detail in result[1]:
-            string += "%30s| %10s\n" % (detail[0], detail[1])
+            string += "%30s | %10s\n" % (detail[0], detail[1])
         print(string)
     print('')
 
