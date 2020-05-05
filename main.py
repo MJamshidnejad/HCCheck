@@ -15,11 +15,13 @@ import urllib3
 import win32com.client
 import xlrd
 from tqdm import tqdm
+import re
 
 raw_file = 'list.xls'
 db_name = 'data.pickle'
 url_file = 'https://g2b.ito.gov.ir/index.php/site/page/view/download'
 
+help_str = ''' '''
 
 def create_database(filename):
     db = collections.defaultdict(dict)
@@ -86,7 +88,8 @@ def beautiful_result(results):
         for detail in result[1]:
             string += "%30s| %10s\n" % (detail[0], detail[1])
         print(string)
-        
+
+
 def download_file(url, filename):
     http = urllib3.PoolManager(num_pools=50)
     r = http.request('get', url, preload_content=False)
@@ -97,6 +100,16 @@ def download_file(url, filename):
         r.release_conn()
     else:
         print("Download failed.")
+        
+
+def is_ip_valid(ip: str):
+    pattern = '''^(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.( 
+                25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.( 
+                25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.( 
+                25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)'''
+    if re.search(pattern, ip):
+        return True
+    return False
 
 
 def main():
@@ -118,10 +131,17 @@ def main():
         db = create_database(db_name)
         print("Database created.")
     
-    
-    ip = ip_address('185.88.153.218')
-    results = search_in_database(db, ip)
-    beautiful_result(results)
+    while True:
+        
+        command = input("Input your IP or your command:\n> ")
+        command = command.strip().lower() 
+        if command == '--help' or command == '-h' :
+            print(help_str)
+            continue
+        
+        ip = ip_address('185.88.153.218')
+        results = search_in_database(db, ip)
+        beautiful_result(results)
 
 
 if __name__ == "__main__":
