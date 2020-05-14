@@ -84,7 +84,7 @@ def url_spliter(URL: str):
     search_obj = re.search(pattern, URL)
     url_p, port, url, sub = search_obj.groups()
     domain = url if url else url_p
-    return domain, port, sub
+    return domain.lower(), port, sub
 
 
 def update_database(cursor: sqlite3.Cursor, row: list):
@@ -99,15 +99,25 @@ def update_database(cursor: sqlite3.Cursor, row: list):
     cursor.executemany("INSERT INTO ips (ip, net_id) VALUES (?,?)", ip_list)
         
 
-def search_in_database(connection, ip: ip_address):
-    result = []
-    index = tuple(str(ip).split('.')[0:2])
-    if index in database:
-        for network in database[index]:
-            if ip in network:
-                result.append((network, database[index][network]))
+def search_for_ip(connection: sqlite3.Connection, ip: ip_address):
+    sql_str = '''
+    SELECT ips.ip, networks.domain, networks.port, networks.sub, networks.net_addr, networks.date
+    FROM ips
+    JOIN networks
+        ON networks.id = ips.net_id
+    WHERE ips.ip = ?'''
+    cur = connection.execute(sql_str, (str(ip),)) 
+    return cur.fetchall()
 
-    return result
+
+def search_for_url(connection: sqlite3.Connection, url:str):
+    sql_str = '''
+    SELECT domain, port, sub, net_addr, date
+    FROM nerworks WHERE domain REGEXP ?
+    '''
+    expr = '.*'+url
+    cur = connection.execute(sql_str, (expr,))
+    return cur.fetchall()
 
 
 def beautiful_result(results):
@@ -144,10 +154,16 @@ def is_ip_valid(ip: str):
     return False
 
 
+def regexp(expr, item):
+    reg = re.compile(expr)
+    return reg.search(item) is not None
+
+
 def main():
     print("Welcome to HCCheck")
     try:
         conn = sqlite3.connect(sql_name)
+        conn.create_function("REGEXP",2, regexp)
         print('Database connected.')
     except:
         print("Something is wrong with database.")
