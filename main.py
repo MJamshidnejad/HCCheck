@@ -78,10 +78,12 @@ def create_database(connection: sqlite3.Connection):
     cur.close()
 
 
-def url_spliter(url: str):
+def url_spliter(URL: str):
     domain = port = sub = None
-    string = r"^(?:https?:\/\/)?(?:www.)?(?:(?:(?P<url_p>[\w_\-\.]+):(?P<port>\d{0,5}))|(?P<url>[\w_\-\.]+))(?P<sub>\/[^\n]+)?"
-    
+    pattern = r"(?:https?:\/\/)?(?:www.)?(?:(?:(?P<url_p>[\w_\-\.]+):(?P<port>\d{0,5}))|(?P<url>[\w_\-\.]+))(?P<sub>\/[^\n]+)?"
+    search_obj = re.search(pattern, URL)
+    url_p, port, url, sub = search_obj.groups()
+    domain = url if url else url_p
     return domain, port, sub
 
 
@@ -151,7 +153,7 @@ def main():
         print("Something is wrong with database.")
         quit()
 
-    result = conn.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    result = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
     result = result.fetchall()
     if 'networks' not in result and 'ips' not in result: 
         # Database is new
