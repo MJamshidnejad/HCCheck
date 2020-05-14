@@ -18,7 +18,7 @@ from tqdm import tqdm
 import re
 
 raw_file = 'list.xls'
-db_name = 'data.pickle'
+db_name = 'data.pkl'
 url_file = 'https://g2b.ito.gov.ir/index.php/site/page/view/download'
 
 help_str = """This program check if IP is in national network or not.
@@ -29,6 +29,7 @@ it uses ITOs list for doing that.
     -h or --help: give help
     -e or --exit: exit
     -q or --quit: quit (!)\n"""
+
 
 def create_database(filename):
     db = collections.defaultdict(dict)
@@ -158,5 +159,8 @@ def main():
                     +"Get help with -h or --help\n")
 
 
+
 if __name__ == "__main__":
     main()
+	
+	
