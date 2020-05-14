@@ -17,8 +17,11 @@ import xlrd
 from tqdm import tqdm
 import re
 
+import sqlite3
+
 raw_file = 'list.xls'
 db_name = 'data.pickle'
+sql_name = 'data.db'
 url_file = 'https://g2b.ito.gov.ir/index.php/site/page/view/download'
 
 help_str = """This program check if IP is in national network or not.
@@ -30,8 +33,23 @@ it uses ITOs list for doing that.
     -e or --exit: exit
     -q or --quit: quit (!)\n"""
 
-def create_database(filename):
-    db = collections.defaultdict(dict)
+def create_database(connection: sqlite3.Connection):
+    table_creating_str = ''' 
+    CREATE TABLE networks (
+        id INTEGER AUTOINCREMENT PRIMARY KEY UNIQUE,
+        net_addr TEXT NOTNULL,
+        domain TEXT NOT NULL,
+        port VARCHAR(5) DEFAULT NULL,
+        sub TEXT DEFAULT NULL,
+        data char(10) NOT NULL
+    );
+
+    CREATE TABLE ips (
+        id INTEGER AUTOINCREMENT PRIMARY KEY UNIQUE,
+        ip VARCHAR(15) NOT NULL,
+        net_id INTEGER NOT NULL
+    );'''
+    
     try:
         xcl = win32com.client.Dispatch('Excel.Application')
         wb = xcl.workbooks.open(os.getcwd()+'\\'+'list.xls')
@@ -43,37 +61,42 @@ def create_database(filename):
     except:
         print(raw_file + " not found.") # problem is here
         quit()
+    
+    cur = connection.cursor()
+    try:
+        cur.executescript(table_creating_str)
+    except:
+        print('Tables are not created.')
 
     sheet = xl.sheet_by_index(0)
     for i in range(1, sheet.nrows):
         row = sheet.row_values(i)
-        update_database(db, row)
-
-    with open(filename, 'wb') as fout:
-        pickle.dump(db, fout, pickle.HIGHEST_PROTOCOL)
-
-    return db
+        update_database(cur, row)
+    
+    connection.commit()
+    cur.close()
 
 
-def update_database(database, row: list):
-    index = tuple(row[1].split('.')[0:2])
-    ip = ip_network(row[1], strict=False)
-    detail = (row[0], '-'.join(row[2].split('/')))  # Website, updating date
-    database[index].setdefault(ip, set()).add(detail)
-    # if index in database:
-    #     database[index].setdefault(ip, []).append(detail)
-    # else:
-    #     database[index] = dict()
-    #     database[index].setdefault(ip, []).append(detail)
+def url_spliter(url: str):
+    domain = port = sub = None
+    string = r"^(?:https?:\/\/)?(?:www.)?(?:(?:(?P<url_p>[\w_\-\.]+):(?P<port>\d{0,5}))|(?P<url>[\w_\-\.]+))(?P<sub>\/[^\n]+)?"
+    
+    return domain, port, sub
 
 
-def load_database(filename):
-    with open('data.pickle', 'rb') as fin:
-        db = pickle.load(fin)
-    return db
+def update_database(cursor: sqlite3.Cursor, row: list):
+    net_addr = ip_network(row[1], strict=False)
+    date = '-'.join(row[2].split('/'))  # Website, updating date
+    domain, port, sub = url_spliter(row[0])
+    cursor.execute('''INSERT INTO networks (net_addr, domain, port, sub, date)
+                    VALUES (?,?,?,?,?)''', (net_addr, domain, port, sub, date))
+    cursor.execute("SELECT id FROM networks WHERE net_addr = ? and date = ?", (net_addr, date))
+    net_id = int(cursor.fetchone())
+    ip_list = [(str(ip),net_id) for ip in list(net_addr)]
+    cursor.executemany("INSERT INTO ips (ip, net_id) VALUES (?,?)", ip_list)
+        
 
-
-def search_in_database(database, ip: ip_address):
+def search_in_database(connection, ip: ip_address):
     result = []
     index = tuple(str(ip).split('.')[0:2])
     if index in database:
@@ -120,22 +143,28 @@ def is_ip_valid(ip: str):
 
 def main():
     print("Welcome to HCCheck")
-    if os.path.exists('./' + db_name):
-        if True: print("Loading database...")
-        db = load_database(db_name)
-        print("Database loaded.")
-        
-    elif os.path.exists('./' + raw_file):
-        print("Creating database...")
-        db = create_database(db_name)
-        print("Database created.")
-    else:
-        print("You need to download list file.")
-        download_file(url_file, raw_file)
-        print("The list downloaded.")
-        print("Creating database...")
-        db = create_database(db_name)
-        print("Database created.")
+    try:
+        conn = sqlite3.connect(sql_name)
+        print('Database connected.')
+    except:
+        print("Something is wrong with database.")
+        quit()
+
+    result = conn.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    result = result.fetchall()
+    if 'networks' not in result and 'ips' not in result: 
+        # Database is new
+        if os.path.exists('./' + raw_file):
+            print("Loading data to database...")
+            create_database(conn)
+            print("Loading finished.")
+        else:
+            print("You need to download list file.")
+            download_file(url_file, raw_file)
+            print("The list downloaded.")
+            print("Loading data to database...")
+            create_database(conn)
+            print("Loading finished.")
     
     while True:
         command = input("Input your IP or your command:\n> ")
@@ -150,7 +179,7 @@ def main():
         
         elif is_ip_valid(command):
             ip = ip_address(command)
-            results = search_in_database(db, ip)
+            results = search_in_database(conn, ip)
             beautiful_result(results)
         
         else:
