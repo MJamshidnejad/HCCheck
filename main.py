@@ -58,6 +58,7 @@ def create_database(connection: sqlite3.Connection):
         xcl.Quit()
         
         xl = xlrd.open_workbook(raw_file)
+        sheet = xl.sheet_by_index(0)
     except:
         print(raw_file + " not found.") # problem is here
         quit()
@@ -67,8 +68,8 @@ def create_database(connection: sqlite3.Connection):
         cur.executescript(table_creating_str)
     except:
         print('Tables are not created.')
+        quit()
 
-    sheet = xl.sheet_by_index(0)
     for i in range(1, sheet.nrows):
         row = sheet.row_values(i)
         update_database(cur, row)
@@ -89,8 +90,8 @@ def update_database(cursor: sqlite3.Cursor, row: list):
     date = '-'.join(row[2].split('/'))  # Website, updating date
     domain, port, sub = url_spliter(row[0])
     cursor.execute('''INSERT INTO networks (net_addr, domain, port, sub, date)
-                    VALUES (?,?,?,?,?)''', (net_addr, domain, port, sub, date))
-    cursor.execute("SELECT id FROM networks WHERE net_addr = ? and date = ?", (net_addr, date))
+                    VALUES (?,?,?,?,?)''', (str(net_addr), domain, port, sub, date))
+    cursor.execute("SELECT id FROM networks WHERE net_addr = ? AND date = ?", (str(net_addr), date))
     net_id = int(cursor.fetchone())
     ip_list = [(str(ip),net_id) for ip in list(net_addr)]
     cursor.executemany("INSERT INTO ips (ip, net_id) VALUES (?,?)", ip_list)
