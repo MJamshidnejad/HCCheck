@@ -115,7 +115,7 @@ def search_for_url(connection: sqlite3.Connection, url:str):
     SELECT domain, port, sub, net_addr, date
     FROM nerworks WHERE domain REGEXP ?
     '''
-    expr = '.*'+url
+    expr = '.*'+url.replace('.',r'\.')
     cur = connection.execute(sql_str, (expr,))
     return cur.fetchall()
 
@@ -186,23 +186,32 @@ def main():
             print("Loading finished.")
     
     while True:
-        command = input("Input your IP or your command:\n> ")
+        command = input("Input IP, URL or a command:\n> ")
         command = command.strip().lower()
-        print(command)
-        if command in ('-h', '--help') :
-            print(help_str)
-        
-        elif command in ('-q', '-e', '--quit', '--exit'):
-            print('Thank you. Have good!\n')
-            quit()
-        
+        # print(command)
+        if command.startswith('-'):
+            if command in ('-h', '--help') :
+                print(help_str)
+            elif command in ('-q', '-e', '--quit', '--exit'):
+                print('Thank you. Have good!\n')
+                conn.close()
+                quit()
+            else:
+                print("Your command is not valid.\n"
+                        +"Get help with -h or --help\n")
+                
         elif is_ip_valid(command):
             ip = ip_address(command)
-            results = search_in_database(conn, ip)
+            results = search_for_ip(conn, ip)
             beautiful_result(results)
         
+        elif len(command) >= 5:
+            results = search_for_url(conn, command)
+            print(results)
+            
         else:
             print("Your command is not valid.\n"
+                    +"your URL length must be grater than 4.\n"
                     +"Get help with -h or --help\n")
 
 
