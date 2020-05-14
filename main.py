@@ -35,17 +35,17 @@ it uses ITOs list for doing that.
 
 def create_database(connection: sqlite3.Connection):
     table_creating_str = ''' 
-    CREATE TABLE networks (
-        id INTEGER AUTOINCREMENT PRIMARY KEY UNIQUE,
-        net_addr TEXT NOTNULL,
+    CREATE TABLE IF NOT EXISTS networks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+        net_addr TEXT NOT NULL,
         domain TEXT NOT NULL,
         port VARCHAR(5) DEFAULT NULL,
         sub TEXT DEFAULT NULL,
-        data char(10) NOT NULL
+        date char(10) NOT NULL
     );
 
-    CREATE TABLE ips (
-        id INTEGER AUTOINCREMENT PRIMARY KEY UNIQUE,
+    CREATE TABLE IF NOT EXISTS ips (
+        id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
         ip VARCHAR(15) NOT NULL,
         net_id INTEGER NOT NULL
     );'''
@@ -81,7 +81,7 @@ def create_database(connection: sqlite3.Connection):
 def url_spliter(URL: str):
     domain = port = sub = None
     pattern = r"(?:https?:\/\/)?(?:www.)?(?:(?:(?P<url_p>[\w_\-\.]+):(?P<port>\d{0,5}))|(?P<url>[\w_\-\.]+))(?P<sub>\/[^\n]+)?"
-    search_obj = re.search(pattern, URL)
+    search_obj = re.search(pattern, URL, re.IGNORECASE)
     url_p, port, url, sub = search_obj.groups()
     domain = url if url else url_p
     return domain.lower(), port, sub
@@ -93,8 +93,8 @@ def update_database(cursor: sqlite3.Cursor, row: list):
     domain, port, sub = url_spliter(row[0])
     cursor.execute('''INSERT INTO networks (net_addr, domain, port, sub, date)
                     VALUES (?,?,?,?,?)''', (str(net_addr), domain, port, sub, date))
-    cursor.execute("SELECT id FROM networks WHERE net_addr = ? AND date = ?", (str(net_addr), date))
-    net_id = int(cursor.fetchone())
+    # cursor.execute("SELECT id FROM networks WHERE net_addr = ? AND date = ?", (str(net_addr), date))
+    net_id = cursor.lastrowid
     ip_list = [(str(ip),net_id) for ip in list(net_addr)]
     cursor.executemany("INSERT INTO ips (ip, net_id) VALUES (?,?)", ip_list)
         
@@ -113,7 +113,7 @@ def search_for_ip(connection: sqlite3.Connection, ip: ip_address):
 def search_for_url(connection: sqlite3.Connection, url:str):
     sql_str = '''
     SELECT domain, port, sub, net_addr, date
-    FROM nerworks WHERE domain REGEXP ?
+    FROM networks WHERE domain REGEXP ?
     '''
     expr = '.*'+url.replace('.',r'\.')
     cur = connection.execute(sql_str, (expr,))
@@ -171,7 +171,8 @@ def main():
 
     result = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
     result = result.fetchall()
-    if 'networks' not in result and 'ips' not in result: 
+    result = [x[0] for x in result]
+    if 'networks' not in result: 
         # Database is new
         if os.path.exists('./' + raw_file):
             print("Loading data to database...")
@@ -193,7 +194,7 @@ def main():
             if command in ('-h', '--help') :
                 print(help_str)
             elif command in ('-q', '-e', '--quit', '--exit'):
-                print('Thank you. Have good!\n')
+                print('Thank you. Goog Luck!\n')
                 conn.close()
                 quit()
             else:
@@ -203,7 +204,7 @@ def main():
         elif is_ip_valid(command):
             ip = ip_address(command)
             results = search_for_ip(conn, ip)
-            beautiful_result(results)
+            print(results)
         
         elif len(command) >= 5:
             results = search_for_url(conn, command)
