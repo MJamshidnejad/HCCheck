@@ -6,18 +6,17 @@
     
 """
 
-import collections
+
 import os
-import pickle
+import re
+import sqlite3
 from ipaddress import ip_address, ip_network
 
 import urllib3
 import win32com.client
 import xlrd
+from prettytable import PrettyTable
 from tqdm import tqdm
-import re
-
-import sqlite3
 
 raw_file = 'list.xls'
 db_name = 'data.pickle'
@@ -120,18 +119,22 @@ def search_for_url(connection: sqlite3.Connection, url:str):
     return cur.fetchall()
 
 
-def beautiful_result(results):
+def beautiful_result(results, url: str = None):
     if not results:
-        print("IP not found.\n")
-        return None
-    for result in results:
-        string = "'%s' network detail:\n" % (str(result[0]))
-        string += "               site            |    date \n"
-        string += "----------------------------------------------\n"
-        for detail in result[1]:
-            string += "%30s | %10s\n" % (detail[0], detail[1])
-        print(string)
-    print('')
+        print("Nothing found.\n")
+    
+    table = PrettyTable()
+    table.field_names = ['Domain', 'Port', 'Sub', 'Network Address', 'Date']
+    if len(results[0]) == 6:
+        for result in results:
+            table.add_row(list(result[1:]))
+        print('\nResults for IP:', results[0][0])
+    else:
+        for result in results:
+            table.add_row(list(result))
+        print('\nResults for URL:', url)
+    table.sortby = 'Domain'
+    print(table,'\n')
 
 
 def download_file(url, filename):
@@ -163,7 +166,7 @@ def main():
     print("Welcome to HCCheck")
     try:
         conn = sqlite3.connect(sql_name)
-        conn.create_function("REGEXP",2, regexp)
+        conn.create_function("REGEXP",2, regexp)    # Add regular expresions feature to Sqlite
         print('Database connected.')
     except:
         print("Something is wrong with database.")
@@ -204,11 +207,11 @@ def main():
         elif is_ip_valid(command):
             ip = ip_address(command)
             results = search_for_ip(conn, ip)
-            print(results)
+            beautiful_result(results)
         
         elif len(command) >= 5:
             results = search_for_url(conn, command)
-            print(results)
+            beautiful_result(results, url=command)
             
         else:
             print("Your command is not valid.\n"
