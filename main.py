@@ -6,19 +6,22 @@
     
 """
 
-import collections
+
 import os
-import pickle
+import re
+import sqlite3
 from ipaddress import ip_address, ip_network
+# from time import perf_counter
 
 import urllib3
 import win32com.client
 import xlrd
+from prettytable import PrettyTable
 from tqdm import tqdm
-import re
 
 raw_file = 'list.xls'
-db_name = 'data.pkl'
+db_name = 'data.pickle'
+sql_name = 'data.db'
 url_file = 'https://g2b.ito.gov.ir/index.php/site/page/view/download'
 
 help_str = """This program check if IP is in national network or not.
@@ -30,9 +33,24 @@ it uses ITOs list for doing that.
     -e or --exit: exit
     -q or --quit: quit (!)\n"""
 
+def create_database(connection: sqlite3.Connection):
+    # t = perf_counter()
+    table_creating_str = ''' 
+    CREATE TABLE IF NOT EXISTS networks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+        net_addr TEXT NOT NULL,
+        domain TEXT NOT NULL,
+        port VARCHAR(5) DEFAULT NULL,
+        sub TEXT DEFAULT NULL,
+        date char(10) NOT NULL
+    );
 
-def create_database(filename):
-    db = collections.defaultdict(dict)
+    CREATE TABLE IF NOT EXISTS ips (
+        id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+        ip VARCHAR(15) NOT NULL,
+        net_id INTEGER NOT NULL
+    );'''
+    
     try:
         xcl = win32com.client.Dispatch('Excel.Application')
         wb = xcl.workbooks.open(os.getcwd()+'\\'+'list.xls')
@@ -41,62 +59,99 @@ def create_database(filename):
         xcl.Quit()
         
         xl = xlrd.open_workbook(raw_file)
+        sheet = xl.sheet_by_index(0)
     except:
         print(raw_file + " not found.") # problem is here
         quit()
+    
+    cur = connection.cursor()
+    try:
+        cur.executescript(table_creating_str)
+    except:
+        print('Tables are not created.')
+        quit()
 
-    sheet = xl.sheet_by_index(0)
     for i in range(1, sheet.nrows):
         row = sheet.row_values(i)
-        update_database(db, row)
+        update_database(cur, row)
+        
+    cur.executescript('''
+    WITH dups AS(
+        SELECT ROW_NUMBER() OVER (
+                    PARTITION BY net_addr, domain
+                    ORDER BY date DESC
+        ) RowNum, * FROM networks
+    )
+    DELETE FROM networks
+    WHERE id IN ( SELECT id FROM dups WHERE RowNum > 1);
 
-    with open(filename, 'wb') as fout:
-        pickle.dump(db, fout, pickle.HIGHEST_PROTOCOL)
-
-    return db
-
-
-def update_database(database, row: list):
-    index = tuple(row[1].split('.')[0:2])
-    ip = ip_network(row[1], strict=False)
-    detail = (row[0], '-'.join(row[2].split('/')))  # Website, updating date
-    database[index].setdefault(ip, set()).add(detail)
-    # if index in database:
-    #     database[index].setdefault(ip, []).append(detail)
-    # else:
-    #     database[index] = dict()
-    #     database[index].setdefault(ip, []).append(detail)
-
-
-def load_database(filename):
-    with open('data.pickle', 'rb') as fin:
-        db = pickle.load(fin)
-    return db
+    DELETE FROM ips
+    WHERE net_id NOT IN ( SELECT id FROM networks );
+    ''')
+    cur.execute('VACUUM')
+    connection.commit()
+    cur.close()
+    # print('Creating time = ', str(perf_counter() - t))
 
 
-def search_in_database(database, ip: ip_address):
-    result = []
-    index = tuple(str(ip).split('.')[0:2])
-    if index in database:
-        for network in database[index]:
-            if ip in network:
-                result.append((network, database[index][network]))
-
-    return result
+def url_spliter(URL: str):
+    domain = port = sub = None
+    pattern = r"(?:https?:\/\/)?(?:www.)?(?:(?:(?P<url_p>[\w_\-\.]+):(?P<port>\d{0,5}))|(?P<url>[\w_\-\.]+))(?P<sub>\/[^\n]+)?"
+    search_obj = re.search(pattern, URL, re.IGNORECASE)
+    url_p, port, url, sub = search_obj.groups()
+    domain = url if url else url_p
+    return domain.lower(), port, sub
 
 
-def beautiful_result(results):
+def update_database(cursor: sqlite3.Cursor, row: list):
+    net_addr = ip_network(row[1], strict=False)
+    date = '-'.join(row[2].split('/'))  # Website, updating date
+    domain, port, sub = url_spliter(row[0])
+    cursor.execute('''INSERT INTO networks (net_addr, domain, port, sub, date)
+                    VALUES (?,?,?,?,?)''', (str(net_addr), domain, port, sub, date))
+    
+    net_id = cursor.lastrowid
+    ip_list = [(str(ip),net_id) for ip in list(net_addr)]
+    cursor.executemany("INSERT INTO ips (ip, net_id) VALUES (?,?)", ip_list)
+    
+
+def search_for_ip(connection: sqlite3.Connection, ip: ip_address):
+    sql_str = '''
+    SELECT ips.ip, networks.domain, networks.port, networks.sub, networks.net_addr, networks.date
+    FROM ips
+    JOIN networks
+        ON networks.id = ips.net_id
+    WHERE ips.ip = ?'''
+    cur = connection.execute(sql_str, (str(ip),)) 
+    return cur.fetchall()
+
+
+def search_for_url(connection: sqlite3.Connection, url:str):
+    sql_str = '''
+    SELECT domain, port, sub, net_addr, date
+    FROM networks WHERE domain REGEXP ?
+    '''
+    expr = '.*'+url.replace('.',r'\.')
+    cur = connection.execute(sql_str, (expr,))
+    return cur.fetchall()
+
+
+def beautiful_result(results, url: str = None):
     if not results:
-        print("IP not found.\n")
-        return None
-    for result in results:
-        string = "'%s' network detail:\n" % (str(result[0]))
-        string += "               site            |    date \n"
-        string += "----------------------------------------------\n"
-        for detail in result[1]:
-            string += "%30s | %10s\n" % (detail[0], detail[1])
-        print(string)
-    print('')
+        print("Nothing found.\n")
+    
+    table = PrettyTable()
+    table.field_names = ['Domain', 'Port', 'Sub', 'Network Address', 'Date']
+    if len(results[0]) == 6:
+        for result in results:
+            table.add_row(list(result[1:]))
+        print('\nResults for IP:', results[0][0])
+    else:
+        for result in results:
+            table.add_row(list(result))
+        print('\nResults for URL:', url)
+    table.sortby = 'Domain'
+    print(table,'\n')
 
 
 def download_file(url, filename):
@@ -119,48 +174,69 @@ def is_ip_valid(ip: str):
     return False
 
 
+def regexp(expr, item):
+    reg = re.compile(expr)
+    return reg.search(item) is not None
+
+
 def main():
     print("Welcome to HCCheck")
-    if os.path.exists('./' + db_name):
-        if True: print("Loading database...")
-        db = load_database(db_name)
-        print("Database loaded.")
-        
-    elif os.path.exists('./' + raw_file):
-        print("Creating database...")
-        db = create_database(db_name)
-        print("Database created.")
-    else:
-        print("You need to download list file.")
-        download_file(url_file, raw_file)
-        print("The list downloaded.")
-        print("Creating database...")
-        db = create_database(db_name)
-        print("Database created.")
+    try:
+        conn = sqlite3.connect(sql_name)
+        conn.create_function("REGEXP",2, regexp)    # Add regular expresions feature to Sqlite
+        print('Database connected.')
+    except:
+        print("Something is wrong with database.")
+        quit()
+
+    result = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    result = result.fetchall()
+    result = [x[0] for x in result]
+    if 'networks' not in result: 
+        # Database is new
+        if os.path.exists('./' + raw_file):
+            print("Loading data to database...")
+            create_database(conn)
+            print("Loading finished.")
+        else:
+            print("You need to download list file.")
+            download_file(url_file, raw_file)
+            print("The list downloaded.")
+            print("Loading data to database...")
+            create_database(conn)
+            print("Loading finished.")
     
     while True:
-        command = input("Input your IP or your command:\n> ")
+        command = input("Input IP, URL or a command:\n> ")
         command = command.strip().lower()
-        print(command)
-        if command in ('-h', '--help') :
-            print(help_str)
-        
-        elif command in ('-q', '-e', '--quit', '--exit'):
-            print('Thank you. Have good!\n')
-            quit()
-        
+        # print(command)
+        if command.startswith('-'):
+            if command in ('-h', '--help') :
+                print(help_str)
+            elif command in ('-q', '-e', '--quit', '--exit'):
+                print('Thank you. Goog Luck!\n')
+                conn.close()
+                quit()
+            else:
+                print("Your command is not valid.\n"
+                        +"Get help with -h or --help\n")
+                
         elif is_ip_valid(command):
             ip = ip_address(command)
-            results = search_in_database(db, ip)
+            results = search_for_ip(conn, ip)
             beautiful_result(results)
         
+        elif len(command) >= 5:
+            results = search_for_url(conn, command)
+            beautiful_result(results, url=command)
+            
         else:
             print("Your command is not valid.\n"
+                    +"your URL length must be grater than 4.\n"
                     +"Get help with -h or --help\n")
 
 
 
 if __name__ == "__main__":
     main()
-	
 	

@@ -2,3 +2,5 @@
 *.md
 *.mhtml
 *.xls
+*.pkl
+*.db
