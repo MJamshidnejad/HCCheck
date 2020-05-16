@@ -139,6 +139,7 @@ def search_for_url(connection: sqlite3.Connection, url:str):
 def beautiful_result(results, url: str = None):
     if not results:
         print("Nothing found.\n")
+        return None
     
     table = PrettyTable()
     table.field_names = ['Domain', 'Port', 'Sub', 'Network Address', 'Date']
