@@ -11,14 +11,13 @@ import os
 import re
 import sqlite3
 from ipaddress import ip_address, ip_network
+# from time import perf_counter
 
 import urllib3
 import win32com.client
 import xlrd
 from prettytable import PrettyTable
 from tqdm import tqdm
-
-from time import perf_counter
 
 raw_file = 'list.xls'
 db_name = 'data.pickle'
@@ -35,7 +34,7 @@ it uses ITOs list for doing that.
     -q or --quit: quit (!)\n"""
 
 def create_database(connection: sqlite3.Connection):
-    t = perf_counter()
+    # t = perf_counter()
     table_creating_str = ''' 
     CREATE TABLE IF NOT EXISTS networks (
         id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
@@ -75,10 +74,24 @@ def create_database(connection: sqlite3.Connection):
     for i in range(1, sheet.nrows):
         row = sheet.row_values(i)
         update_database(cur, row)
-    
+        
+    cur.executescript('''
+    WITH dups AS(
+        SELECT ROW_NUMBER() OVER (
+                    PARTITION BY net_addr, domain
+                    ORDER BY date DESC
+        ) RowNum, * FROM networks
+    )
+    DELETE FROM networks
+    WHERE id IN ( SELECT id FROM dups WHERE RowNum > 1);
+
+    DELETE FROM ips
+    WHERE net_id NOT IN ( SELECT id FROM networks );
+    ''')
+    cur.execute('VACUUM')
     connection.commit()
     cur.close()
-    print('Creating time = ', str(perf_counter() - t))
+    # print('Creating time = ', str(perf_counter() - t))
 
 
 def url_spliter(URL: str):
@@ -94,23 +107,12 @@ def update_database(cursor: sqlite3.Cursor, row: list):
     net_addr = ip_network(row[1], strict=False)
     date = '-'.join(row[2].split('/'))  # Website, updating date
     domain, port, sub = url_spliter(row[0])
-    # cursor.execute('''INSERT INTO networks (net_addr, domain, port, sub, date)
-    #                 VALUES (?,?,?,?,?)''', (str(net_addr), domain, port, sub, date))
-    # # cursor.execute("SELECT id FROM networks WHERE net_addr = ? AND date = ?", (str(net_addr), date))
-    # net_id = cursor.lastrowid
-    # ip_list = [(str(ip),net_id) for ip in list(net_addr)]
-    # cursor.executemany("INSERT INTO ips (ip, net_id) VALUES (?,?)", ip_list)
-    
     cursor.execute('''INSERT INTO networks (net_addr, domain, port, sub, date)
-                    SELECT ?,?,?,?,?
-                    WHERE NOT EXISTS (
-                        SELECT * FROM networks WHERE 
-                        net_addr = ? AND domain = ?)
-                    ''', (str(net_addr), domain, port, sub, date, str(net_addr), domain))
-    if cursor.rowcount > 0:
-        net_id = cursor.lastrowid
-        ip_list = [(str(ip),net_id) for ip in list(net_addr)]
-        cursor.executemany("INSERT INTO ips (ip, net_id) VALUES (?,?)", ip_list)
+                    VALUES (?,?,?,?,?)''', (str(net_addr), domain, port, sub, date))
+    
+    net_id = cursor.lastrowid
+    ip_list = [(str(ip),net_id) for ip in list(net_addr)]
+    cursor.executemany("INSERT INTO ips (ip, net_id) VALUES (?,?)", ip_list)
     
 
 def search_for_ip(connection: sqlite3.Connection, ip: ip_address):
