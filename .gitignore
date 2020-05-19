@@ -3,3 +3,5 @@
 *.xls
 *.pkl
 *.db
+!data.db
+!data.pkl
