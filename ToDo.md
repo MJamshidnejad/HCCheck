@@ -7,5 +7,6 @@
 - [x] Use module for create table
 - [x] Delete redundants form sql
 - [ ] Some improvement on Sqlite scheme
+- [ ] Create update function
 - [ ] Get data with web scrapping
 - [ ] Create GUI for program
