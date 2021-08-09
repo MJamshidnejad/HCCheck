@@ -5,7 +5,7 @@
 prettytable == 0.7.2
 
 # main.py: 17
-pywin32 == 227
+pywin32 == 301
 
 # main.py: 20
 tqdm == 4.46.0
