@@ -11,7 +11,7 @@ pywin32 == 301
 tqdm == 4.46.0
 
 # main.py: 16
-urllib3 == 1.26.5
+urllib3 == 1.26.17
 
 # main.py: 18
 xlrd == 1.2.0
